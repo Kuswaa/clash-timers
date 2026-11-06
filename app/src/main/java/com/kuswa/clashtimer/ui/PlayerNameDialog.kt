@@ -2,7 +2,10 @@ package com.kuswa.clashtimer.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -11,8 +14,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -27,14 +31,15 @@ import com.kuswa.clashtimer.core.AppSettings
  */
 @Composable
 fun PlayerNameDialog(current: String?, firstLaunch: Boolean, onDone: (String) -> Unit, onDismiss: () -> Unit) {
-    var text by remember { mutableStateOf(current.orEmpty()) }
+    var text by rememberSaveable { mutableStateOf(current.orEmpty()) }
     val save = { onDone(AppSettings.cleanName(text)) }
     AlertDialog(
+        modifier = Modifier.imePadding(),
         onDismissRequest = onDismiss,
         title = { Text(if (firstLaunch) "Welcome, Chief!" else "Player name") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("What name should the widget show? Leave it empty to use \"${AppSettings.DEFAULT_PLAYER_NAME}\".")
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("What name should the app and widget show? Leave it empty to use \"${AppSettings.DEFAULT_PLAYER_NAME}\".")
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it.take(AppSettings.MAX_PLAYER_NAME) },

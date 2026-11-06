@@ -29,7 +29,6 @@ fun AboutSection() {
     var showLicence by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("About", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
         Text("Clash Timers $version")
         Text("Works fully offline", fontWeight = FontWeight.Bold)
         Text(
@@ -37,7 +36,7 @@ fun AboutSection() {
                 "keeps it on this phone and sends nothing anywhere. No account, no ads, no tracking.",
             style = MaterialTheme.typography.bodySmall,
         )
-        Text(FAN_CONTENT_DISCLAIMER, style = MaterialTheme.typography.bodySmall)
+        Text(FAN_CONTENT_DISCLAIMER, style = MaterialTheme.typography.bodyMedium)
         Text(
             "Clash of Clans names and images are the property of Supercell. Names, upgrade times and images " +
                 "come from the clash-of-clans-data package. Font: Lilita One by Juan Montoreano, " +

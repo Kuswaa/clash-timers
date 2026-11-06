@@ -68,6 +68,7 @@ android {
     buildFeatures {
         compose = true
     }
+    sourceSets.getByName("androidTest").assets.srcDir("src/test/resources")
 }
 
 dependencies {
@@ -79,6 +80,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.datastore.preferences)
     testImplementation(libs.junit)

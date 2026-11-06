@@ -5,9 +5,11 @@ import android.content.ClipboardManager
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -27,14 +29,15 @@ import com.kuswa.clashtimer.crash.CrashReport
 import com.kuswa.clashtimer.crash.CrashReporter
 
 /** Diagnostics: the last saved crash report (crash/CrashReporter.kt), with Copy / Show / Clear. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CrashSection() {
     val context = LocalContext.current
     var report by remember { mutableStateOf(CrashReporter.lastReport(context)) }
     var expanded by remember { mutableStateOf(false) }
+    var confirmTest by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Last crash", fontWeight = FontWeight.Bold)
         val r = report
         if (r == null) {
             Text("None saved.", style = MaterialTheme.typography.bodySmall)
@@ -44,7 +47,7 @@ fun CrashSection() {
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
                     context.getSystemService(ClipboardManager::class.java)
                         ?.setPrimaryClip(ClipData.newPlainText("Clash Timers crash", r))
@@ -62,12 +65,25 @@ fun CrashSection() {
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (r != null) TextButton(onClick = { context.startActivity(CrashActivity.intent(context)) }) { Text("Open crash screen") }
             // Lets the player check that the crash screen opens on their phone (no adb to check it otherwise).
-            TextButton(onClick = { throw RuntimeException("Test crash from the Diagnostics button (not a real error)") }) {
+            TextButton(onClick = { confirmTest = true }) {
                 Text("Test crash screen")
             }
         }
+    }
+    if (confirmTest) {
+        AlertDialog(
+            onDismissRequest = { confirmTest = false },
+            title = { Text("Test the crash screen?") },
+            text = { Text("This intentionally closes the app and replaces the saved crash report with a test report.") },
+            confirmButton = {
+                TextButton(onClick = { throw RuntimeException("Test crash from Support (not a real error)") }) {
+                    Text("Crash and test")
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmTest = false }) { Text("Cancel") } },
+        )
     }
 }

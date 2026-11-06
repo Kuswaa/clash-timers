@@ -36,6 +36,22 @@ Clash Timers isn't on the Play Store, so you install the APK yourself.
 
 Requires Android 8.0 or newer.
 
+## App navigation
+
+The app uses a Material 3 Expressive interface with three destinations:
+
+- **Timers:** your village summary, upgrades ordered by predicted finish, live countdowns, progress and finish times. The All, Builders, Lab and Pets filters stay visible while you scroll. Use **Sync from clipboard** after copying a fresh export in Clash of Clans. A failed sync explains the problem and provides a retry.
+- **Settings:** grouped player, notification, builder, potion and helper settings. Tap a value to edit it; automatic builder/helper values can be restored from the editor. Changes save immediately. Reset asks for confirmation.
+- **Support:** crash reports, saved-export details, recent activity, widget diagnostics, exact alarm access and app credits. Testing the crash screen also asks for confirmation.
+
+The app uses `MaterialExpressiveTheme`, expressive motion and emphasized typography, a shape-changing Sync button, morphing loading indicators, wavy timer progress and the Expressive short navigation bar. Colors stay generic, with Android's dynamic system colors where available. Grouped surfaces use rounded Material shapes, and countdowns adapt within 24–36 sp to stay on one line without clipping. The home-screen widget and its timer calculations are unchanged.
+
+Material3 is pinned to `1.5.0-alpha13` because these Expressive APIs are experimental and not available in stable `1.4.0`. This version works with the existing Compose BOM; the rest of the SDK/toolchain is unchanged.
+
+![The Material 3 Expressive app showing light and dark timer dashboards and grouped settings](docs/screenshots/material3-expressive.png)
+
+The preview uses the repository's anonymized sample export at a fixed reference time.
+
 ## Setup
 
 1. **Open the app once.** It asks for the name to show on the widget. If you skip this, it shows "Chief".
@@ -45,7 +61,7 @@ Requires Android 8.0 or newer.
 
 ### Battery and auto-start
 
-Many phones stop background apps to save battery, which can make notifications arrive late or stop after a reboot. To prevent that, open the app, go to **Settings → App settings (battery, auto-start)**, and then:
+Many phones stop background apps to save battery, which can make notifications arrive late or stop after a reboot. To prevent that, open the app, go to **Settings → Battery and auto-start settings**, and then:
 
 - Set battery use to **Unrestricted** (some phones call it **No restrictions**).
 - Turn on **Auto-start** if your phone has it. Tecno, Infinix, Xiaomi, Oppo, Vivo and others often do.
@@ -101,7 +117,7 @@ No, only the home village.
 The app doesn't connect to the game or change it, and it doesn't automate anything. It only reads the text that the game's own export button copies. It's still an unofficial app, and Supercell's rules are theirs to decide.
 
 **The app crashed. How do I report it?**
-Open the app, find **Last crash**, tap **Copy** and paste the report into a [bug report](https://github.com/Kuswaa/clash-timers/issues/new/choose).
+Open **Support → Last crash** in the app, tap **Copy** and paste the report into a [bug report](https://github.com/Kuswaa/clash-timers/issues/new/choose).
 
 ## Building from source
 
@@ -118,6 +134,31 @@ cd clash-timers
 ./gradlew :app:testDebugUnitTest   # run the unit tests
 ./gradlew assembleDebug            # debug build you can install right away
 ```
+
+### Optional NixOS emulator shell
+
+If an existing Android SDK emulator cannot find its Linux libraries, the optional Nix shell supplies those libraries without changing global tools or downloading an SDK:
+
+```sh
+nix develop
+export ANDROID_HOME="$HOME/Android/Sdk"
+"$ANDROID_HOME/emulator/emulator" -avd YOUR_AVD
+```
+
+### UI verification
+
+Build and UI checks (start a test emulator first and use `ANDROID_SERIAL` if more than one device is connected):
+
+```sh
+./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+./gradlew --no-daemon :app:connectedDebugAndroidTest
+```
+
+UI tests use the repository's sample export fixtures. They check Expressive theme motion/color roles and unclipped countdown layout, and exercise sync states, navigation, filters, setting validation, automatic values, reset confirmation, saved UI state and dialog saving with the keyboard open. Screenshots are written to the target app's private `files/ui-screenshots` directory and checked for blank rendering. To keep them after a Gradle run, add `-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true`, then extract with `adb exec-out run-as com.kuswa.clashtimer cat files/ui-screenshots/FILENAME.png`.
+
+For real on-screen keyboard checks on a disposable emulator with a hardware keyboard configured, enable `adb shell settings put secure show_ime_with_hard_keyboard 1` before running the tests.
+
+Android Test Device (ATD) images disable drawing by default. Before visual tests on an ATD emulator, run `adb shell setprop debug.hwui.drawing_enabled true` and restart the app process. For narrow/wide/large-text checks, use a disposable emulator with `adb shell wm size`, `adb shell wm density` and `adb shell settings put system font_scale`; do not change a personal device.
 
 ### Release build
 

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.ClashTimer" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.ClashTimer" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 
     <!-- SyncActivity: invisible, no window animation, so tapping Sync looks like nothing opened. -->
     <style name="Theme.ClashTimer.Invisible" parent="android:Theme.Translucent.NoTitleBar">
