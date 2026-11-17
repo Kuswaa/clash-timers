@@ -14,12 +14,16 @@ A home screen widget for Android that shows your Clash of Clans builder, laborat
 
 ## Features
 
-- **Every timer in one widget:** all your builders, the Goblin Builder during events, the laboratory and the pet house, with progress bars and icons.
-- **Live countdowns:** times tick every second on the home screen, without opening the app.
+- **Every timer in one widget:** all your builders, the Goblin Builder and Goblin Researcher during events, the laboratory and the pet house, with progress bars and icons.
+- **Live countdowns or finish times:** times tick every second on the home screen, without opening the app. In Settings you can show the finish time instead (`Thu 18:36`), or both (`1d 4h · Thu 18:36`).
 - **Real finish times:** the in-game timer ignores helpers you haven't used yet. Clash Timers includes the coming Builder's Apprentice and Lab Assistant sessions, so you see when an upgrade will really finish.
-- **Potions and snacks:** tap to add a Builder Potion, Research Potion, Pet Potion or Builder Bite, and every countdown updates straight away. Boosts stack the same way they do in the game. Tap `−` to undo.
-- **Helper links:** tap `+` on a row to put the Apprentice or Lab Assistant on that upgrade.
-- **Notifications:** get told the moment a builder, the lab or the pet house is free. Tapping the notification opens Clash of Clans.
+- **Potions and snacks:** tap to add a Builder Potion, Research Potion, Pet Potion, Builder Bite or Study Soup, and every countdown updates straight away. Boosts stack the same way they do in the game. Tap `−` to undo. Potions running in the game are picked up from the export.
+- **Helpers:** tap `+` on a row to put the Apprentice or Lab Assistant on that upgrade. The bottom line shows what each helper is doing, its cooldown, or that it's ready again.
+- **Notifications:** get told the moment a builder, the lab or the pet house is free, or a helper is ready. Tapping the notification opens Clash of Clans.
+- **Sync from the game:** add the **Clash Sync** tile to Quick Settings, then copy the data in Clash, pull down the notification shade and tap the tile.
+- **Several villages:** each village is saved separately, so syncing a second account doesn't overwrite the first. The widget shows the village you synced last.
+- **New game items:** things from a game update that the app doesn't know yet show as `New building`, `New squad` and so on. In the app's **Unknown items** section you can give them a name and an image.
+- **Any size:** at 4×5 you see everything; resize it smaller and the rows shrink, down to one line per section.
 - **Adjustable:** if Supercell rebalances something, you can change potion strength, helper savings, the helper interval and the builder count in Settings.
 
 <p align="center">
@@ -42,6 +46,7 @@ Requires Android 8.0 or newer.
 2. **Add the widget.** Long-press your home screen, choose **Widgets**, find **Clash Timers** and place it. The default size is 4×5.
 3. **Sync your village.** In Clash of Clans, go to **Settings → Data Export → Copy**. Go back to your home screen and tap **Sync** on the widget.
 4. **Allow notifications** if you want finish alerts. You can turn them on under **Settings → Notifications** in the app.
+5. **Optional: add the Clash Sync tile.** Pull down the notification shade, edit the Quick Settings tiles and drag **Clash Sync** in. Then you can sync without leaving the game.
 
 ### Battery and auto-start
 
@@ -55,7 +60,7 @@ Many phones stop background apps to save battery, which can make notifications a
 The game doesn't offer a live connection, so the widget works from the **village data export** you copy in the game.
 
 1. **Copy:** the export is a block of text the game puts on your clipboard. It lists your upgrades and how much time each had left when you copied it.
-2. **Sync:** when you tap Sync, the app reads the clipboard once, checks that it's a village export and saves the timers. It doesn't read the clipboard at any other time. Android 12 and newer may show a "pasted from clipboard" message, which is normal.
+2. **Sync:** when you tap Sync (on the widget, the Clash Sync tile or in the app), the app reads the clipboard once, checks that it's a village export and saves the timers under that village's tag. It doesn't read the clipboard at any other time. Android 12 and newer may show a "pasted from clipboard" message, which is normal.
 3. **Countdown:** the export records when it was copied, so timers stay correct even if you sync a while later. From then on the app works out the remaining time on the phone.
 
 Sync again whenever you start a new upgrade or change something in the game. The widget can't see the game by itself.
@@ -66,15 +71,14 @@ Sync again whenever you start a new upgrade or change something in the game. The
 
 - There's no account, analytics, ads or tracking.
 - It only reads the clipboard when you tap Sync.
-- Your village data and settings are stored in the app's private storage on your phone.
+- Your village data, settings and the names and images you add are stored in the app's private storage on your phone.
 - Crash reports stay on your phone too. You choose whether to copy one and share it.
-
-If you've turned on Android's own system backup, Android may include this app's data in your personal Google backup, as it does for most apps. That is done by Android, not by this app.
+- The app opts out of Android backups and device-to-device transfers, so its data isn't copied to Google or to a new phone.
 
 | Permission | Why it's needed |
 |---|---|
 | Exact alarms (`USE_EXACT_ALARM`, `SCHEDULE_EXACT_ALARM`) | Update the widget at the exact moment a timer finishes |
-| Notifications (`POST_NOTIFICATIONS`) | Tell you when a builder, the lab or the pet house is free |
+| Notifications (`POST_NOTIFICATIONS`) | Tell you when a builder, the lab or the pet house is free, or a helper is ready |
 | Run at startup (`RECEIVE_BOOT_COMPLETED`) | Set the alarms again after a reboot |
 
 ## FAQ
@@ -91,8 +95,11 @@ Some launchers don't draw live countdowns properly. Turn off **Live seconds coun
 **Notifications arrive late or not at all.**
 Follow the [battery and auto-start](#battery-and-auto-start) steps, and check that notifications are on in the app's Settings.
 
-**A row says `Unknown (1000123)`.**
-That's something new from a game update which the app doesn't have a name for yet. Please [open an issue](https://github.com/Kuswaa/clash-timers/issues/new/choose) with the number.
+**A row says `New building` or `New squad`.**
+That's something new from a game update which the app doesn't have a name for yet. Open the app's **Unknown items** section: you can type its name and pick an image for it there, and the widget uses them straight away. It would also help if you [open an issue](https://github.com/Kuswaa/clash-timers/issues/new/choose) with the number shown there, so the next version knows it.
+
+**I play two accounts.**
+Each village is saved separately. Sync the account you want to see; the widget shows the one you synced last, and notifications keep coming for both.
 
 **Does it support the Builder Base?**
 No, only the home village.
@@ -154,7 +161,7 @@ The signed APK is written to `app/build/outputs/apk/release/`. Android won't ins
 | `app/src/test/resources/fixtures` | Anonymized village exports used by the tests |
 | `tools/` | Node scripts that regenerate the names, upgrade times and icons from [clash-of-clans-data](https://github.com/chiefpansancolt/clash-of-clans-data) |
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) if you'd like to help.
+This is a solo project, so pull requests aren't accepted, but bug reports and ideas are very welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

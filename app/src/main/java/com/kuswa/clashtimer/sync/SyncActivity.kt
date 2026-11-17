@@ -1,5 +1,7 @@
 package com.kuswa.clashtimer.sync
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -30,9 +32,13 @@ class SyncActivity : ComponentActivity() {
         finishQuietly()
     }
 
+    /** Who opened this screen: the widget's Sync button or the Quick Settings tile (for the sync log). */
+    private val source: String
+        get() = intent?.getStringExtra(EXTRA_SOURCE)?.takeIf { it == SOURCE_TILE } ?: SOURCE_WIDGET
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        log(null, "Sync screen opened from widget")
+        log(null, "Sync screen opened from ${if (source == SOURCE_TILE) "Quick Settings tile" else "widget"}")
         handler.postDelayed(hardTimeout, HARD_TIMEOUT_MS)
     }
 
@@ -58,7 +64,7 @@ class SyncActivity : ComponentActivity() {
         if (viaFallback) log(null, "No window focus after ${FOCUS_FALLBACK_MS} ms; read clipboard anyway")
 
         lifecycleScope.launch {
-            val result = SyncRunner.sync(this@SyncActivity, text, SOURCE)
+            val result = SyncRunner.sync(this@SyncActivity, text, source)
             // Shown while this activity is still in front, so ROMs that block background toasts allow it.
             Toast.makeText(this@SyncActivity, result.message, Toast.LENGTH_LONG).show()
             finishQuietly()
@@ -68,7 +74,8 @@ class SyncActivity : ComponentActivity() {
     private fun log(ok: Boolean?, message: String) {
         val app = applicationContext
         // NonCancellable: breadcrumbs must survive the activity finishing right after.
-        lifecycleScope.launch(NonCancellable) { StateRepository(app).log(SOURCE, ok, message) }
+        val from = source
+        lifecycleScope.launch(NonCancellable) { StateRepository(app).log(from, ok, message) }
     }
 
     private fun finishQuietly() {
@@ -85,9 +92,17 @@ class SyncActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    private companion object {
-        const val SOURCE = "widget"
-        const val FOCUS_FALLBACK_MS = 1500L
-        const val HARD_TIMEOUT_MS = 8000L
+    companion object {
+        const val EXTRA_SOURCE = "com.kuswa.clashtimer.SYNC_SOURCE"
+        const val SOURCE_WIDGET = "widget"
+        const val SOURCE_TILE = "tile"
+        private const val FOCUS_FALLBACK_MS = 1500L
+        private const val HARD_TIMEOUT_MS = 8000L
+
+        /** Explicit intent for the widget's Sync button and the Quick Settings tile. */
+        fun intent(context: Context, source: String): Intent =
+            Intent(context, SyncActivity::class.java)
+                .putExtra(EXTRA_SOURCE, source)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION or Intent.FLAG_ACTIVITY_CLEAR_TASK)
     }
 }

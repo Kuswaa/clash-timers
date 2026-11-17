@@ -39,7 +39,12 @@ data class Job(
     val key: String get() = "$category:$dataId:$targetLevel#$occurrence"
 }
 
-data class Helper(val dataId: Int, val level: Int, val cooldown: Long)
+/**
+ * One entry of the export's `helpers` array.
+ * @param cooldown `helper_cooldown`: seconds until this helper's next session, or null when the key is
+ *   missing (seen on the Prospector in alt_export_1.json; treated as "no cooldown running").
+ */
+data class Helper(val dataId: Int, val level: Int, val cooldown: Long?)
 
 data class VillageExport(
     val tag: String,
@@ -59,6 +64,12 @@ data class VillageExport(
     val helperOnFinishedItem: Set<JobCategory> = emptySet(),
     /** `boosts.builder_boost`: seconds left on an active home-village builder potion at T0, or null. */
     val builderBoostRemaining: Long? = null,
+    /** `boosts.lab_boost`: seconds left on an active research potion at T0, or null. */
+    val labBoostRemaining: Long? = null,
+    /** `boosts.pet_boost`: seconds left on an active pet potion at T0, or null. */
+    val petBoostRemaining: Long? = null,
+    /** Every item the export lists in the sections the app names (for the "Unknown items" screen). */
+    val items: List<ExportItem> = emptyList(),
 ) {
     /** Builders derived from the export: huts + B.O.B. Null if no huts were found. */
     val derivedTotalBuilders: Int?
@@ -70,18 +81,39 @@ data class VillageExport(
     val labJobs: List<Job> get() = jobs.filter { it.category == JobCategory.LAB }
     val petJobs: List<Job> get() = jobs.filter { it.category == JobCategory.PET }
 
-    /** The spec says at most one; extras (shouldn't happen) are still kept in [jobs]. */
-    val labJob: Job? get() = labJobs.firstOrNull()
+    /** The laboratory's own research (not the event Goblin Researcher's). */
+    val labJob: Job? get() = labJobs.firstOrNull { !it.isGoblin }
+    /** Research done by the event Goblin Researcher (`"extra": true` on a lab item), if any. */
+    val goblinLabJob: Job? get() = labJobs.firstOrNull { it.isGoblin }
     val petJob: Job? get() = petJobs.firstOrNull()
 
     fun helper(dataId: Int): Helper? = helpers.firstOrNull { it.dataId == dataId }
 
-    /** All helpers share the same cooldown; null if the export has no helpers. */
-    val helperCooldown: Long? get() = helpers.firstOrNull()?.cooldown
+    /** All helpers share the same cooldown; the first one present, or null if none has one. */
+    val helperCooldown: Long? get() = helpers.firstNotNullOfOrNull { it.cooldown }
 
-    /** First helper activation after T0. Repeats every 86400 s. */
+    /** First helper activation after T0. Repeats every [BoostSettings.helperPeriodSec]. */
     val nextHelperActivation: Long? get() = helperCooldown?.let { timestamp + it }
 }
+
+/** Which list of the export an item came from; decides its fallback name and icon. */
+enum class ItemKind { BUILDING, MODULE, TRAP, HERO, GUARDIAN, TROOP, SPELL, SIEGE_MACHINE, PET }
+
+/** An item listed in the export, upgrading or not. [parentDataId] is the crafted defense of a module. */
+data class ExportItem(val kind: ItemKind, val dataId: Int, val parentDataId: Int? = null)
+
+val JobSource.itemKind: ItemKind
+    get() = when (this) {
+        JobSource.BUILDING -> ItemKind.BUILDING
+        JobSource.MODULE -> ItemKind.MODULE
+        JobSource.TRAP -> ItemKind.TRAP
+        JobSource.HERO -> ItemKind.HERO
+        JobSource.GUARDIAN -> ItemKind.GUARDIAN
+        JobSource.UNIT -> ItemKind.TROOP
+        JobSource.SPELL -> ItemKind.SPELL
+        JobSource.SIEGE_MACHINE -> ItemKind.SIEGE_MACHINE
+        JobSource.PET -> ItemKind.PET
+    }
 
 sealed interface ParseResult {
     data class Success(val export: VillageExport) : ParseResult

@@ -15,8 +15,10 @@ const val DEFAULT_HELPER_PERIOD_SEC = 23 * HOUR
  *  - Builder potion 9 h saved per hour  → 10×
  *  - Builder Bite   1 h saved per hour  →  2×
  *  - Research/Pet potion 23 h per hour  → 24×
+ *  - Study Soup     3 h saved per hour  →  4×
  *  - Helpers: saving = helper level in hours per hour (Apprentice lvl 8 → 9× total speed).
  *    This is the game's "Working speed ×N" convention, which means N hours *saved* per hour.
+ * Who each boost affects is fixed (plan 1.1 §2, [BoostType.affects]); 1.0's "Goblin potion" switch is gone.
  */
 @Serializable
 data class BoostSettings(
@@ -25,6 +27,7 @@ data class BoostSettings(
     val builderBiteSavingSec: Long = 1 * HOUR,
     val researchPotionSavingSec: Long = 23 * HOUR,
     val petPotionSavingSec: Long = 23 * HOUR,
+    val studySoupSavingSec: Long = 3 * HOUR,
     /** null = use the Apprentice's level from the export (level hours). */
     val apprenticeSavingSecOverride: Long? = null,
     /** null = use the Lab Assistant's level from the export (level hours). */
@@ -32,24 +35,35 @@ data class BoostSettings(
     val helperWindowSec: Long = HOUR,
     /** Time from one helper session's start to the next: 23 h, not 24 h. */
     val helperPeriodSec: Long = DEFAULT_HELPER_PERIOD_SEC,
-    /** Builder potions and snacks also speed up the event Goblin Builder's job (assumed). */
-    val boostsApplyToGoblin: Boolean = true,
 ) {
     fun savingFor(type: BoostType): Long = when (type) {
         BoostType.BUILDER_POTION -> builderPotionSavingSec
         BoostType.BUILDER_BITE -> builderBiteSavingSec
         BoostType.RESEARCH_POTION -> researchPotionSavingSec
         BoostType.PET_POTION -> petPotionSavingSec
+        BoostType.STUDY_SOUP -> studySoupSavingSec
     }
 }
 
-/** Tap-activated boosts. Each applies to every busy job of its category. */
+/**
+ * Tap-activated potions and snacks. Each one speeds up every busy job in [categories], the event
+ * Goblin Builder and Goblin Researcher included. Helpers are separate boosts and are never sped up
+ * by these: the speeds just add up ([TimerEngine]).
+ */
 @Serializable
-enum class BoostType(val category: JobCategory) {
-    BUILDER_POTION(JobCategory.BUILDER),
-    BUILDER_BITE(JobCategory.BUILDER),
-    RESEARCH_POTION(JobCategory.LAB),
-    PET_POTION(JobCategory.PET),
+enum class BoostType(val categories: Set<JobCategory>) {
+    /** 6 builders + Goblin Builder. */
+    BUILDER_POTION(setOf(JobCategory.BUILDER)),
+    /** 6 builders + Goblin Builder. */
+    BUILDER_BITE(setOf(JobCategory.BUILDER)),
+    /** Lab + Goblin Researcher. */
+    RESEARCH_POTION(setOf(JobCategory.LAB)),
+    PET_POTION(setOf(JobCategory.PET)),
+    /** Study Soup (snack): lab, Goblin Researcher and pet house. */
+    STUDY_SOUP(setOf(JobCategory.LAB, JobCategory.PET)),
+    ;
+
+    fun affects(job: Job): Boolean = job.category in categories
 }
 
 /** One potion/snack window, [start, end). */
@@ -148,8 +162,7 @@ class TimerEngine(val settings: BoostSettings = BoostSettings()) {
     fun boostsFor(job: Job, export: VillageExport, links: HelperLinks, boosts: List<BoostUse>): List<SpeedBoost> {
         val result = mutableListOf<SpeedBoost>()
         val dur = settings.boostDurationSec.toDouble()
-        val potionsApply = !job.isGoblin || settings.boostsApplyToGoblin
-        boosts.filter { potionsApply && it.type.category == job.category }.forEach { use ->
+        boosts.filter { it.type.affects(job) }.forEach { use ->
             result += FixedWindow(use.start, use.end, settings.savingFor(use.type) / dur)
         }
         result += helperWindows(job, export, links)
@@ -164,7 +177,8 @@ class TimerEngine(val settings: BoostSettings = BoostSettings()) {
         val (helperId, override) = when {
             job.category == JobCategory.BUILDER && job.key == links.apprenticeJobKey ->
                 GameIds.HELPER_BUILDERS_APPRENTICE to settings.apprenticeSavingSecOverride
-            job.category == JobCategory.LAB && job.key == links.labAssistantJobKey ->
+            // Main lab job only: never the Goblin Researcher's, even if a stale link points there.
+            job.category == JobCategory.LAB && !job.isGoblin && job.key == links.labAssistantJobKey ->
                 GameIds.HELPER_LAB_ASSISTANT to settings.labAssistantSavingSecOverride
             else -> return emptyList()
         }
@@ -174,12 +188,15 @@ class TimerEngine(val settings: BoostSettings = BoostSettings()) {
         val rate = saving.toDouble() / settings.helperWindowSec
         return listOfNotNull(
             job.helperTimer.takeIf { it > 0 }?.let { FixedWindow(export.timestamp, export.timestamp + it, rate) },
-            PeriodicWindow(
-                firstStart = export.timestamp + helper.cooldown,
-                duration = settings.helperWindowSec,
-                period = settings.helperPeriodSec.coerceAtLeast(settings.helperWindowSec),
-                extraRate = rate,
-            ),
+            // No `helper_cooldown` in the export: the next session time is unknown, so none is predicted.
+            helper.cooldown?.let { cooldown ->
+                PeriodicWindow(
+                    firstStart = export.timestamp + cooldown,
+                    duration = settings.helperWindowSec,
+                    period = settings.helperPeriodSec.coerceAtLeast(settings.helperWindowSec),
+                    extraRate = rate,
+                )
+            },
         )
     }
 

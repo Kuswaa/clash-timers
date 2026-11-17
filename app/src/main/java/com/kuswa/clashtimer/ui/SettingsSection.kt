@@ -32,6 +32,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kuswa.clashtimer.core.AppSettings
 import com.kuswa.clashtimer.core.BoostSettings
+import com.kuswa.clashtimer.core.CountdownStyle
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
+import androidx.compose.ui.semantics.Role
 import com.kuswa.clashtimer.core.GameIds
 import com.kuswa.clashtimer.core.VillageExport
 import com.kuswa.clashtimer.notify.Notifier
@@ -40,7 +45,7 @@ private const val H = 3600L
 
 /**
  * Settings on the launcher screen: boost amounts, helper interval,
- * total builders, the Goblin potion toggle and notifications. Every change is saved at once and
+ * total builders, countdown style and notifications. Every change is saved at once and
  * the widget is redrawn by [onChange]'s caller.
  */
 @Composable
@@ -80,11 +85,36 @@ fun SettingsSection(
             )
         }
 
+        Text("Widget times", style = MaterialTheme.typography.labelLarge)
+        for ((style, label) in listOf(
+            CountdownStyle.TIME_LEFT to "Time left (10:57:12)",
+            CountdownStyle.FINISH_TIME to "Finish time (Thu 18:36)",
+            CountdownStyle.BOTH to "Both (1d 4h · Thu 18:36)",
+        )) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().selectable(
+                    selected = settings.countdownStyle == style,
+                    onClick = { onChange { it.copy(countdownStyle = style) } },
+                    role = Role.RadioButton,
+                ),
+            ) {
+                RadioButton(selected = settings.countdownStyle == style, onClick = null)
+                Text(label, modifier = Modifier.padding(start = 8.dp))
+            }
+        }
+
         Text("Potions and snacks: hours saved per hour of use", style = MaterialTheme.typography.labelLarge)
         HoursStepper("Builder potion", b.builderPotionSavingSec, 1..47) { v -> boosts { it.copy(builderPotionSavingSec = v) } }
         HoursStepper("Builder Bite", b.builderBiteSavingSec, 1..23) { v -> boosts { it.copy(builderBiteSavingSec = v) } }
         HoursStepper("Research potion", b.researchPotionSavingSec, 1..47) { v -> boosts { it.copy(researchPotionSavingSec = v) } }
         HoursStepper("Pet potion", b.petPotionSavingSec, 1..47) { v -> boosts { it.copy(petPotionSavingSec = v) } }
+        HoursStepper("Study Soup", b.studySoupSavingSec, 1..23) { v -> boosts { it.copy(studySoupSavingSec = v) } }
+        Text(
+            "Builder potion and Bite also speed up the Goblin Builder; research potion the Goblin Researcher; " +
+                "Study Soup the lab, the Goblin Researcher and the pet house. Helpers are never sped up by them.",
+            style = MaterialTheme.typography.bodySmall,
+        )
 
         Text("Helpers", style = MaterialTheme.typography.labelLarge)
         AutoHoursStepper(
@@ -120,10 +150,6 @@ fun SettingsSection(
                 ?.let { v -> { onChange { it.copy(totalBuildersOverride = v) } } },
             onAuto = if (total != null) ({ onChange { it.copy(totalBuildersOverride = null) } }) else null,
         )
-        SwitchRow(
-            "Potions and Bites also speed up the Goblin Builder",
-            b.boostsApplyToGoblin,
-        ) { on -> boosts { it.copy(boostsApplyToGoblin = on) } }
 
         Text("Notifications", style = MaterialTheme.typography.labelLarge)
         SwitchRow("Notify when a builder, the lab or the pet house is free", settings.notificationsEnabled) { on ->

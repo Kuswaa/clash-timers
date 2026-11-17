@@ -10,7 +10,8 @@ import kotlinx.serialization.json.longOrNull
 
 /**
  * Parses the Clash of Clans village data export (Settings → Data Export → Copy).
- * Pure Kotlin, no Android dependencies. Builder Base sections (`*2`, `boosts`) are ignored.
+ * Pure Kotlin, no Android dependencies. Builder Base sections (`*2`, `clocktower_*`) are ignored, and so
+ * is every key the app doesn't know (`building_variants`, `emotes`, `weapon`, `gear_up`, …).
  */
 object ExportParser {
 
@@ -33,9 +34,11 @@ object ExportParser {
 
         val jobs = mutableListOf<Job>()
         val helperOnFinished = mutableSetOf<JobCategory>()
+        val items = LinkedHashSet<ExportItem>()
 
         /** Adds a job if [obj] has a `timer`; a helper link on an item without one means the helper is idle. */
         fun visit(obj: JsonObject, category: JobCategory, source: JobSource, parentId: Int? = null, typeId: Int? = null) {
+            obj.int("data")?.let { items += ExportItem(source.itemKind, it, typeId ?: parentId) }
             val job = obj.toJob(category, source, parentId, typeId)
             if (job != null) jobs += job
             else if (obj.flag("helper_recurrent")) helperOnFinished += category
@@ -66,8 +69,9 @@ object ExportParser {
         // Pet house.
         visitAll("pets", JobCategory.PET, JobSource.PET)
 
-        // Active home-village builder potion (Builder Base `clocktower_*` is ignored).
-        val builderBoost = (root["boosts"] as? JsonObject)?.long("builder_boost")?.takeIf { it > 0 }
+        // Active home-village potions, seconds left at T0 (Builder Base `clocktower_*` is ignored).
+        val boosts = root["boosts"] as? JsonObject
+        fun boostLeft(key: String): Long? = boosts?.long(key)?.takeIf { it > 0 }
 
         val townHall = buildings.objects().firstOrNull { it.int("data") == GameIds.TOWN_HALL }?.int("lvl")
         val huts = buildings.objects()
@@ -77,7 +81,8 @@ object ExportParser {
 
         val helpers = root.array("helpers").objects().mapNotNull { h ->
             val id = h.int("data") ?: return@mapNotNull null
-            Helper(dataId = id, level = h.int("lvl") ?: 0, cooldown = h.long("helper_cooldown") ?: 0L)
+            // The Prospector can come without `helper_cooldown` (alt_export_1.json): kept as null.
+            Helper(dataId = id, level = h.int("lvl") ?: 0, cooldown = h.long("helper_cooldown")?.coerceAtLeast(0))
         }
 
         return ParseResult.Success(
@@ -90,7 +95,10 @@ object ExportParser {
                 helpers = helpers,
                 jobs = assignOccurrences(jobs),
                 helperOnFinishedItem = helperOnFinished,
-                builderBoostRemaining = builderBoost,
+                builderBoostRemaining = boostLeft("builder_boost"),
+                labBoostRemaining = boostLeft("lab_boost"),
+                petBoostRemaining = boostLeft("pet_boost"),
+                items = items.toList(),
             )
         )
     }

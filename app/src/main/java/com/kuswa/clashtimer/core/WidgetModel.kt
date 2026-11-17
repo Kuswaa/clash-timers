@@ -1,5 +1,9 @@
 package com.kuswa.clashtimer.core
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.ceil
 
 /**
@@ -32,11 +36,14 @@ data class WidgetModel(
     val builderPotion: BoostPill,
     val researchPotion: BoostPill,
     val petPotion: BoostPill,
+    /** Study Soup: one button on the LAB line; its window speeds up the lab, the Goblin Researcher and the pets. */
+    val studySoup: BoostPill,
     /** One row per builder job (finished ones say Completed); free builders get no rows. */
     val builderRows: List<WidgetRow>,
+    /** The laboratory's own research (or `Idle`). */
     val labRow: WidgetRow,
     val petRow: WidgetRow,
-    /** Helper status (or the sync-failed message), left side of the footer. */
+    /** Footer lines on the left: one per helper (or the sync-failed message). */
     val footerLeft: List<FooterPart>,
     /** `synced 14m ago`, right side of the footer. */
     val footerRight: String,
@@ -46,10 +53,26 @@ data class WidgetModel(
      * a potion/helper window edge (progress bars), a pill's minutes, the footer's sync age.
      */
     val nextChangeAt: Long?,
+    /** The event Goblin Researcher's research while it runs (GOBLIN row under the lab row); null when done. */
+    val labGoblinRow: WidgetRow? = null,
 ) {
     val buildersLabel: String get() = "BUILDERS $buildersBusy/$buildersTotal"
     val title: String get() = townHall?.let { "$playerName TH$it" } ?: playerName
-    val allRows: List<WidgetRow> get() = builderRows + labRow + petRow
+    /** The LAB section: own research first, then the Goblin Researcher's. */
+    val labRows: List<WidgetRow> get() = listOfNotNull(labRow, labGoblinRow)
+    val allRows: List<WidgetRow> get() = builderRows + labRows + petRow
+
+    /**
+     * The one-line-per-section layout for very small widgets: the next builder job to finish (or, if
+     * none runs, the first finished one / "Builders idle"), the next lab job to finish, and the pet row.
+     */
+    val summaryRows: Triple<WidgetRow, WidgetRow, WidgetRow>
+        get() = Triple(
+            builderRows.firstOrNull { it.kind == RowKind.RUNNING } ?: builderRows.firstOrNull()
+                ?: WidgetModelBuilder.idleRow("Builders", GameIds.BUILDERS_HUT),
+            labRows.filter { it.kind == RowKind.RUNNING }.minByOrNull { it.finishAt ?: Long.MAX_VALUE } ?: labRow,
+            petRow,
+        )
 }
 
 /** A potion/snack button on a section line: `Bite` / `+1` when idle, minutes left when running. */
@@ -61,15 +84,29 @@ data class BoostPill(
 ) {
     val active: Boolean get() = secondsLeft != null
     val text: String
-        get() = secondsLeft?.let(WidgetModelBuilder::formatPill)
-            ?: if (type == BoostType.BUILDER_BITE) "Bite" else "+1"
+        get() = secondsLeft?.let(WidgetModelBuilder::formatPill) ?: when (type) {
+            BoostType.BUILDER_BITE -> "Bite"
+            BoostType.STUDY_SOUP -> "Soup"
+            else -> "+1"
+        }
 }
 
 enum class FooterTone { NORMAL, IDLE, ERROR }
 
-data class FooterPart(val text: String, val tone: FooterTone = FooterTone.NORMAL)
+/** One footer line. [check] = draw a ✓ after the text (the widget font has no ✓ glyph, so it's a drawable). */
+data class FooterPart(val text: String, val tone: FooterTone = FooterTone.NORMAL, val check: Boolean = false)
 
 enum class RowKind { RUNNING, COMPLETED, IDLE }
+
+/** How a running row shows when it finishes (setting; plan 1.1 §5.2). */
+enum class CountdownStyle {
+    /** `10:57:12` ticking (or `1d 20h` without the live countdown). Default. */
+    TIME_LEFT,
+    /** `Thu 18:36`. */
+    FINISH_TIME,
+    /** `1d 4h · Thu 18:36`, no seconds. */
+    BOTH,
+}
 
 /** The small button at the right of a row. */
 enum class RowButton {
@@ -102,6 +139,12 @@ data class WidgetRow(
     val button: RowButton,
     val goblin: Boolean = false,
     val jobKey: String? = null,
+    /** Drawn when none of [iconIds] has an icon file (bundled or added by the player). */
+    val fallbackIcon: FallbackIcon = FallbackIcon.BUILDING,
+    /** The item's `data` ID when it has no real name; shown in the app's diagnostics, never on the widget. */
+    val unknownId: Int? = null,
+    /** Local finish day and time, `Thu 18:36`, for the "Finish time" display setting. */
+    val finishClock: String? = null,
 ) {
     /** `Inferno Tower → 12`, `Super Wizard Tower (new)`. */
     val label: String
@@ -118,6 +161,19 @@ data class WidgetRow(
             RowKind.COMPLETED -> WidgetModelBuilder.COMPLETED
             RowKind.IDLE -> WidgetModelBuilder.IDLE
         }
+
+    /**
+     * Static status in a [style]: `1d 4h` (time left), `Thu 18:36` (finish time) or
+     * `1d 4h · Thu 18:36` (both, no seconds). Finished and idle rows always say `Completed` / `Idle`.
+     */
+    fun statusText(style: CountdownStyle): String {
+        if (kind != RowKind.RUNNING || finishClock == null) return staticStatus
+        return when (style) {
+            CountdownStyle.TIME_LEFT -> staticStatus
+            CountdownStyle.FINISH_TIME -> finishClock
+            CountdownStyle.BOTH -> "$staticStatus · $finishClock"
+        }
+    }
 }
 
 object WidgetModelBuilder {
@@ -132,6 +188,8 @@ object WidgetModelBuilder {
         names: NameMap,
         times: UpgradeTimes,
         now: Long,
+        /** For clock times on the widget (helper `next 20:49`, finish times). */
+        zone: ZoneId = ZoneId.systemDefault(),
     ): WidgetModel {
         val export = state.export
         val pills = { type: BoostType ->
@@ -143,6 +201,7 @@ object WidgetModelBuilder {
                 buildersBusy = 0, buildersTotal = settings.totalBuilders(null), goblinWorking = false,
                 bite = pills(BoostType.BUILDER_BITE), builderPotion = pills(BoostType.BUILDER_POTION),
                 researchPotion = pills(BoostType.RESEARCH_POTION), petPotion = pills(BoostType.PET_POTION),
+                studySoup = pills(BoostType.STUDY_SOUP),
                 builderRows = emptyList(),
                 labRow = idleRow("Laboratory", LABORATORY), petRow = idleRow("Pet House", PET_HOUSE),
                 footerLeft = if (state.syncFailed) listOf(FooterPart(SYNC_FAILED, FooterTone.ERROR)) else emptyList(),
@@ -167,6 +226,8 @@ object WidgetModelBuilder {
                 job.key == state.links.apprenticeJobKey -> RowButton.APPRENTICE
                 job.key == state.links.labAssistantJobKey -> RowButton.LAB_ASSISTANT
                 job.category == JobCategory.PET -> RowButton.NONE
+                // The Lab Assistant can't work for the Goblin Researcher.
+                job.category == JobCategory.LAB && job.isGoblin -> RowButton.NONE
                 else -> RowButton.LINK
             }
             return WidgetRow(
@@ -182,6 +243,9 @@ object WidgetModelBuilder {
                 button = button,
                 goblin = job.isGoblin,
                 jobKey = job.key,
+                fallbackIcon = Fallbacks.icon(job.source.itemKind, names.isKnown(job)),
+                unknownId = job.dataId.takeUnless { names.isKnown(job) },
+                finishClock = FINISH_CLOCK.format(Instant.ofEpochSecond(finishAt).atZone(zone)),
             )
         }
 
@@ -190,16 +254,17 @@ object WidgetModelBuilder {
         // Free builders get no rows; finished jobs stay as "Completed" until the next sync.
         // The Goblin's row disappears once it is done (it is not one of the player's builders).
         val builderRows = sorted(export.builderJobs).filter { !it.isGoblin || running(it) }.map(::row)
-        val labRow = sorted(export.labJobs).firstOrNull()?.let(::row) ?: idleRow("Laboratory", LABORATORY)
+        // The lab can run two researches at once during the Goblin Researcher event (issues #2, #4).
+        val labRow = sorted(export.labJobs.filter { !it.isGoblin }).firstOrNull()?.let(::row)
+            ?: idleRow("Laboratory", LABORATORY)
+        val labGoblinRow = sorted(export.labJobs.filter { it.isGoblin && running(it) }).firstOrNull()?.let(::row)
         val petRow = sorted(export.petJobs).firstOrNull()?.let(::row) ?: idleRow("Pet House", PET_HOUSE)
 
+        val helpers = HelperStatuses.of(state, settings.boosts, now)
         val footerLeft = if (state.syncFailed) {
             listOf(FooterPart(SYNC_FAILED, FooterTone.ERROR))
         } else {
-            helperStatus(
-                apprentice = runningJob(state.links.apprenticeJobKey, export, ::running)?.let { shortName(it, names) },
-                assistant = runningJob(state.links.labAssistantJobKey, export, ::running)?.let { shortName(it, names) },
-            )
+            helpers.map { helperLine(it, names, now, zone) }
         }
 
         // Edges after which the model itself changes (countdown text edges are added by WidgetSchedule).
@@ -212,6 +277,14 @@ object WidgetModelBuilder {
             state.boosts.filter { it.end > now }.forEach { add(if (it.start > now) it.start else it.end) }
             BoostType.entries.forEach { type -> boostLeft(state.boosts, type, now)?.let { add(now + pillEdgeIn(it)) } }
             add(export.timestamp + agoEdge(now - export.timestamp))
+            // Helper lines count forward by themselves: next session passes, cooldown text, ready.
+            helpers.forEach { h ->
+                when (h) {
+                    is HelperStatus.Working -> h.nextSession?.let(::add)
+                    is HelperStatus.Cooldown -> { add(h.readyAt); HelperStatuses.cooldownTextEdge(h.readyAt, now)?.let(::add) }
+                    is HelperStatus.Ready -> Unit
+                }
+            }
         }
 
         return WidgetModel(
@@ -225,8 +298,10 @@ object WidgetModelBuilder {
             builderPotion = pills(BoostType.BUILDER_POTION),
             researchPotion = pills(BoostType.RESEARCH_POTION),
             petPotion = pills(BoostType.PET_POTION),
+            studySoup = pills(BoostType.STUDY_SOUP),
             builderRows = builderRows,
             labRow = labRow,
+            labGoblinRow = labGoblinRow,
             petRow = petRow,
             footerLeft = footerLeft,
             footerRight = "synced ${formatAgo(now - export.timestamp)}",
@@ -238,34 +313,38 @@ object WidgetModelBuilder {
     const val LABORATORY = 1000007
     const val PET_HOUSE = 1000068
 
-    private fun idleRow(name: String, iconId: Int) = WidgetRow(
+    internal fun idleRow(name: String, iconId: Int) = WidgetRow(
         kind = RowKind.IDLE, name = name, levelText = null, showArrow = false, iconIds = listOf(iconId),
         initials = initials(name), finishAt = null, remaining = 0, progress = 1f, button = RowButton.NONE,
     )
 
-    private fun runningJob(key: String?, export: VillageExport, running: (Job) -> Boolean): Job? =
-        key?.let { k -> export.jobs.firstOrNull { it.key == k } }?.takeIf(running)
-
     /** Heroes by their title (`King`, `Champion`), everything else by its full name. */
     private fun shortName(job: Job, names: NameMap): String {
         val title = names.title(job)
-        return if (job.source == JobSource.HERO) title.substringAfterLast(' ') else title
+        return if (job.source == JobSource.HERO && names.isKnown(job)) title.substringAfterLast(' ') else title
     }
 
+    private val CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
+    /** English day names: the widget font only has Latin letters. */
+    private val FINISH_CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE HH:mm", Locale.ENGLISH)
+
     /**
-     * `Apprentice idle · Assistant idle`, `Apprentice idle · Assistant: Baby Dragon`,
-     * `Helpers: King · Baby Dragon`. Idle parts are drawn in orange.
+     * One footer line per helper (plan 1.1 §3.5), replacing 1.0's misleading "idle":
+     * - working: `Apprentice: King · next 20:49` (next session start);
+     * - on cooldown: `Apprentice: 14h` (time until it can be assigned again);
+     * - ready: `Apprentice ready` + a drawn ✓ ([FooterPart.check]), in orange because it is unused.
      */
-    fun helperStatus(apprentice: String?, assistant: String?): List<FooterPart> =
-        if (apprentice != null && assistant != null) {
-            listOf(FooterPart("Helpers: $apprentice · $assistant"))
-        } else {
-            listOf(
-                apprentice?.let { FooterPart("Apprentice: $it") } ?: FooterPart("Apprentice idle", FooterTone.IDLE),
-                FooterPart(" · "),
-                assistant?.let { FooterPart("Assistant: $it") } ?: FooterPart("Assistant idle", FooterTone.IDLE),
-            )
+    fun helperLine(status: HelperStatus, names: NameMap, now: Long, zone: ZoneId): FooterPart {
+        val who = status.kind.shortName
+        return when (status) {
+            is HelperStatus.Working -> {
+                val next = status.nextSession?.let { " · next " + CLOCK.format(Instant.ofEpochSecond(it).atZone(zone)) } ?: ""
+                FooterPart("$who: ${shortName(status.job, names)}$next")
+            }
+            is HelperStatus.Cooldown -> FooterPart("$who: ${HelperStatuses.formatCooldown(status.readyAt - now)}")
+            is HelperStatus.Ready -> FooterPart("$who ready", FooterTone.IDLE, check = true)
         }
+    }
 
     /** `IT` for Inferno Tower, `S` for Scattershot (first letters of the first two words). */
     fun initials(name: String): String =
@@ -335,23 +414,59 @@ object WidgetModelBuilder {
     }
 }
 
+/** Row sizes by widget height (plan 1.1 §5.5, issue #1). Nothing ever scrolls. */
+enum class LayoutMode {
+    /** 30 dp rows. */
+    NORMAL,
+    /** 25 dp rows. */
+    COMPACT,
+    /** One 25 dp row per section (next finish only), no section lines or footer. */
+    SUMMARY,
+}
+
+object WidgetLayout {
+    /**
+     * Estimated panel height in dp with 30 dp rows (see widget_root.xml / widget_row.xml): padding 20,
+     * header 26, three section lines with 40 dp buttons, two footer lines 34.
+     */
+    fun normalHeightDp(rows: Int): Int = 200 + 33 * rows
+
+    /** The same with 25 dp rows (2 dp apart). */
+    fun compactHeightDp(rows: Int): Int = 200 + 27 * rows
+
+    /** [heightDp] = what the launcher reports; null (unknown) keeps the normal layout. */
+    fun mode(heightDp: Int?, rows: Int): LayoutMode = when {
+        heightDp == null || heightDp >= normalHeightDp(rows) -> LayoutMode.NORMAL
+        heightDp >= compactHeightDp(rows) -> LayoutMode.COMPACT
+        else -> LayoutMode.SUMMARY
+    }
+}
+
 /** When the widget must be re-rendered next. */
 object WidgetSchedule {
     /**
      * Epoch ms of the next re-render: the model's own next change, or the next countdown format edge
      * ([Countdown.segment]) with [liveCountdown], or the next change of the `1d 20h` text without it.
      */
-    fun nextUpdateMs(model: WidgetModel, nowMs: Long, liveCountdown: Boolean): Long? {
+    fun nextUpdateMs(
+        model: WidgetModel,
+        nowMs: Long,
+        liveCountdown: Boolean,
+        style: CountdownStyle = CountdownStyle.TIME_LEFT,
+    ): Long? {
         val candidates = buildList {
             model.nextChangeAt?.let { add(it * 1000) }
             model.allRows.filter { it.kind == RowKind.RUNNING && it.finishAt != null }.forEach { row ->
                 val finishAt = row.finishAt!!
                 // The row turns Completed GRACE_SEC before the finish, so the chronometer never reaches zero.
                 add((finishAt - Finish.GRACE_SEC) * 1000)
-                if (liveCountdown) {
-                    Countdown.segment(finishAt, nowMs)?.let { add(it.nextEdgeMs) }
-                } else {
-                    staticTextEdge(finishAt, nowMs / 1000)?.let { add(it * 1000) }
+                when {
+                    // `Thu 18:36` only changes when the finish itself moves (boost edges are in nextChangeAt).
+                    style == CountdownStyle.FINISH_TIME -> Unit
+                    style == CountdownStyle.TIME_LEFT && liveCountdown ->
+                        Countdown.segment(finishAt, nowMs)?.let { add(it.nextEdgeMs) }
+                    // `1d 20h` alone or in `1d 4h · Thu 18:36`.
+                    else -> staticTextEdge(finishAt, nowMs / 1000)?.let { add(it * 1000) }
                 }
             }
         }

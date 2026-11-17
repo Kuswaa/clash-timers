@@ -11,6 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.ZoneOffset
 
 class WidgetModelTest {
 
@@ -20,7 +21,7 @@ class WidgetModelTest {
     private val settings = AppSettings()
 
     private fun build(now: Long, state: AppState = state2, s: AppSettings = settings, t: UpgradeTimes = times) =
-        WidgetModelBuilder.build(state, s, names, t, now)
+        WidgetModelBuilder.build(state, s, names, t, now, ZoneOffset.UTC)
 
     @Test fun oneHourAfterExport2() {
         val m = build(t0 + 3600)
@@ -52,7 +53,11 @@ class WidgetModelTest {
         assertEquals(RowButton.LAB_ASSISTANT, m.labRow.button)
         assertEquals("Spirit Fox → 8" to "2d 17h", m.petRow.let { it.label to it.staticStatus })
 
-        assertEquals(listOf(FooterPart("Helpers: Cake-A-Pult Damage · Dragon")), m.footerLeft)
+        // 1.1: one line per helper with its next session (T0 + 72189 = Thu 15 Oct 11:48:02 UTC).
+        assertEquals(
+            listOf(FooterPart("Apprentice: Cake-A-Pult Damage · next 11:48"), FooterPart("Assistant: Dragon · next 11:48")),
+            m.footerLeft,
+        )
         assertEquals("synced 1h ago", m.footerRight)
         assertFalse(m.syncFailed)
     }
@@ -90,8 +95,10 @@ class WidgetModelTest {
         assertEquals(COMPLETED, module.staticStatus)
         assertEquals(1f, module.progress)
         assertEquals(RowButton.NONE, module.button)
+        // The Apprentice's last session started at T0 + 72189, so it's on cooldown until 23 h after that
+        // (T0 + 154989, 80382 s from now). The Lab Assistant still works on the Dragon.
         assertEquals(
-            listOf(FooterPart("Apprentice idle", FooterTone.IDLE), FooterPart(" · "), FooterPart("Assistant: Dragon")),
+            listOf(FooterPart("Apprentice: 23h"), FooterPart("Assistant: Dragon · next 10:48")),
             m.footerLeft,
         )
         assertEquals("synced 20h ago", m.footerRight)
@@ -106,17 +113,28 @@ class WidgetModelTest {
         assertEquals("BUILDERS 0/6", m.buildersLabel)
         assertEquals(6, m.builderRows.size) // finished jobs stay until the next sync; free builders get no rows
         assertTrue(m.allRows.all { it.kind == RowKind.COMPLETED })
-        assertEquals("Apprentice idle · Assistant idle", m.footerLeft.joinToString("") { it.text })
+        assertEquals(
+            listOf(FooterPart("Apprentice ready", FooterTone.IDLE, check = true), FooterPart("Assistant ready", FooterTone.IDLE, check = true)),
+            m.footerLeft,
+        )
         assertEquals("synced 30d ago", m.footerRight)
         assertNull(m.nextChangeAt?.takeIf { it < t0 + 30L * 86400 })
     }
 
     @Test fun heroesUseShortNamesInTheFooter() {
         val text = """{"tag":"#T","timestamp":100,"buildings":[],
-            "heroes":[{"data":28000000,"lvl":98,"timer":5000,"helper_recurrent":true}],
-            "units":[{"data":4000023,"lvl":11,"timer":9000,"helper_recurrent":true}]}"""
+            "helpers":[{"data":93000000,"lvl":8,"helper_cooldown":3600},{"data":93000001,"lvl":12,"helper_cooldown":3600}],
+            "heroes":[{"data":28000000,"lvl":98,"timer":50000,"helper_recurrent":true}],
+            "units":[{"data":4000023,"lvl":11,"timer":90000,"helper_recurrent":true}]}"""
         val s = (SyncLogic.apply(AppState(), text) as SyncLogic.Outcome.Synced).state
-        assertEquals(listOf(FooterPart("Helpers: King · Baby Dragon")), build(100, s).footerLeft)
+        assertEquals(
+            listOf(FooterPart("Apprentice: King · next 01:01"), FooterPart("Assistant: Baby Dragon · next 01:01")),
+            build(100, s).footerLeft,
+        )
+        // Without a `helpers` array the linked jobs still show, just without a next session time.
+        val noHelpers = text.replace(Regex(""""helpers":\[[^\]]*\],"""), "")
+        val s2 = (SyncLogic.apply(AppState(), noHelpers) as SyncLogic.Outcome.Synced).state
+        assertEquals(listOf(FooterPart("Apprentice: King"), FooterPart("Assistant: Baby Dragon")), build(100, s2).footerLeft)
     }
 
     @Test fun noLabOrPetJobShowsIdleRows() {

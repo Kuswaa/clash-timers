@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic icon for a troop, hero, guardian or siege machine with no icon file: one figure. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#CFC3B0"
+        android:pathData="M12,4a3.5,3.5 0,1 1,0 7a3.5,3.5 0,1 1,0 -7zM5,20c0,-4 3,-7 7,-7s7,3 7,7z" />
+</vector>

@@ -36,8 +36,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import android.appwidget.AppWidgetManager
+import com.kuswa.clashtimer.core.Accounts
 import com.kuswa.clashtimer.core.AppSettings
-import com.kuswa.clashtimer.core.AppState
+import com.kuswa.clashtimer.core.CountdownStyle
+import com.kuswa.clashtimer.core.LayoutMode
+import com.kuswa.clashtimer.core.WidgetLayout
 import com.kuswa.clashtimer.core.Countdown
 import com.kuswa.clashtimer.core.RowButton
 import com.kuswa.clashtimer.core.RowKind
@@ -55,6 +58,8 @@ import com.kuswa.clashtimer.ui.CrashSection
 import com.kuswa.clashtimer.ui.PlayerNameDialog
 import com.kuswa.clashtimer.ui.SettingsSection
 import com.kuswa.clashtimer.ui.SwitchRow
+import com.kuswa.clashtimer.ui.UnknownItemsSection
+import com.kuswa.clashtimer.core.UserItems
 import com.kuswa.clashtimer.ui.theme.ClashTimerTheme
 import com.kuswa.clashtimer.widget.WidgetAlarm
 import com.kuswa.clashtimer.widget.WidgetIcons
@@ -91,11 +96,14 @@ private fun fmt(epochSec: Long): String = TIME.format(Instant.ofEpochSecond(epoc
 private fun SyncScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val repo = remember { StateRepository(context) }
-    val names = remember { Names.get(context) }
     val times = remember { Times.get(context) }
     val scope = rememberCoroutineScope()
 
-    val state by repo.state.collectAsState(AppState())
+    val userItems by repo.userItems.collectAsState(UserItems())
+    // Bundled names with the player's own names on top, like the widget.
+    val names = remember(userItems) { Names.get(context).withUser(userItems.names) }
+    val accounts by repo.accounts.collectAsState(Accounts())
+    val state = accounts.currentState
     val settings by repo.settings.collectAsState(AppSettings())
     // null until DataStore has loaded, so the first-launch prompt doesn't flash for returning players.
     val storedSettings by repo.settings.collectAsState<AppSettings, AppSettings?>(null)
@@ -121,7 +129,11 @@ private fun SyncScreen(modifier: Modifier = Modifier) {
         while (true) {
             now = System.currentTimeMillis() / 1000
             widgetCount = runCatching { WidgetUpdater.widgetIds(context).size }.getOrDefault(-1)
-            widgetSizes = runCatching { widgetSizeReport(context, state) }.getOrDefault("")
+            widgetSizes = runCatching {
+                // Read the latest state here (this loop outlives recompositions).
+                val model = WidgetModelBuilder.build(repo.currentState(), repo.currentSettings(), names, times, now)
+                widgetSizeReport(context, model)
+            }.getOrDefault("")
             delay(1_000)
         }
     }
@@ -158,6 +170,17 @@ private fun SyncScreen(modifier: Modifier = Modifier) {
             )
         }
         state.export?.let { Text("Export copied at ${fmt(it.timestamp)} (village ${it.tag})") }
+        if (accounts.byTag.size > 1) {
+            // Per-account storage (1.1): the widget shows the most recently synced village.
+            Text(
+                "Saved villages (the widget shows the last one synced):\n" + accounts.all.joinToString("\n") { (tag, s) ->
+                    val e = s.export
+                    "${if (tag == accounts.current) "> " else "  "}$tag" +
+                        (e?.townHallLevel?.let { " TH$it" } ?: "") + (e?.let { " · synced ${fmt(it.timestamp)}" } ?: "")
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
 
         HorizontalDivider()
         SettingsSection(settings, state.export, now) { change ->
@@ -166,6 +189,9 @@ private fun SyncScreen(modifier: Modifier = Modifier) {
                 SyncRunner.refreshWidgets(context, "app")
             }
         }
+
+        HorizontalDivider()
+        UnknownItemsSection(accounts.all.mapNotNull { it.second.export }, userItems)
 
         // ---- Diagnostics (no logcat on most phones): below the settings. ----
         HorizontalDivider()
@@ -209,7 +235,7 @@ private fun SyncScreen(modifier: Modifier = Modifier) {
         Text("The widget should show:", fontWeight = FontWeight.Bold)
         SelectionContainer {
             Text(
-                widgetPreview(WidgetModelBuilder.build(state, settings, names, times, now)),
+                widgetPreview(WidgetModelBuilder.build(state, settings, names, times, now), settings.countdownStyle),
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -234,28 +260,34 @@ private fun SyncLogEntry.line(): String {
 }
 
 /** Each placed widget's size as the launcher reports it, and which row size it gets. */
-private fun widgetSizeReport(context: android.content.Context, state: AppState): String {
+private fun widgetSizeReport(context: android.content.Context, model: WidgetModel): String {
     val manager = AppWidgetManager.getInstance(context)
-    val rows = (state.export?.jobs?.size ?: 0) + 2
+    val rows = model.allRows.size
     return WidgetUpdater.widgetIds(context).joinToString("\n") { id ->
         val o = manager.getAppWidgetOptions(id)
         val w = WidgetRenderer.reportedWidthDp(o)
         val h = WidgetRenderer.reportedHeightDp(o)
         val size = if (w != null && h != null) "${w}×${h} dp" else "size not reported"
-        val rowSize = if (WidgetRenderer.useCompactRows(o, rows)) "compact 25 dp rows" else "30 dp rows"
-        "Widget #$id: $size · $rowSize (30 dp rows need about ${WidgetRenderer.normalHeightDp(rows)} dp)"
+        val rowSize = when (WidgetRenderer.layoutMode(o, rows)) {
+            LayoutMode.NORMAL -> "30 dp rows"
+            LayoutMode.COMPACT -> "compact 25 dp rows"
+            LayoutMode.SUMMARY -> "one line per section"
+        }
+        "Widget #$id: $size · $rowSize (30 dp rows need about ${WidgetLayout.normalHeightDp(rows)} dp, " +
+            "25 dp rows ${WidgetLayout.compactHeightDp(rows)} dp)"
     }
 }
 
 /** The widget model as text, so a rendering problem can be told apart from a data problem. */
-private fun widgetPreview(m: WidgetModel): String = SyncRunner.plainText(buildString {
+private fun widgetPreview(m: WidgetModel, style: CountdownStyle): String = SyncRunner.plainText(buildString {
     appendLine("${m.title}   [Sync]")
     if (!m.hasData) {
         append(if (m.syncFailed) WidgetModelBuilder.SYNC_FAILED else WidgetModelBuilder.NO_DATA)
         return@buildString
     }
     fun line(r: WidgetRow) {
-        val time = if (r.kind == RowKind.RUNNING) Countdown.text(r.remaining) else r.staticStatus
+        val time = if (r.kind == RowKind.RUNNING && style == CountdownStyle.TIME_LEFT) Countdown.text(r.remaining)
+        else r.statusText(style)
         val button = when (r.button) {
             RowButton.NONE -> ""
             RowButton.LINK -> " [+]"
@@ -264,13 +296,15 @@ private fun widgetPreview(m: WidgetModel): String = SyncRunner.plainText(buildSt
         }
         val goblin = if (r.goblin) "GOBLIN " else ""
         val label = if (r.kind == RowKind.RUNNING) r.label else r.name // finished rows: name only
-        appendLine("  $goblin$label | $time | ${(r.progress * 100).toInt()}%$button")
+        val id = r.unknownId?.let { " ($it)" } ?: "" // raw ID only here, never on the widget
+        appendLine("  $goblin$label$id | $time | ${(r.progress * 100).toInt()}%$button")
     }
     appendLine("${m.buildersLabel}${if (m.goblinWorking) " + Goblin" else ""}   [${m.bite.text}] [${m.builderPotion.text}]")
     m.builderRows.forEach(::line)
-    appendLine("LAB   [${m.researchPotion.text}]")
-    line(m.labRow)
+    appendLine("LAB   [${m.studySoup.text}] [${m.researchPotion.text}]")
+    m.labRows.forEach(::line)
     appendLine("PETS   [${m.petPotion.text}]")
     line(m.petRow)
-    append(m.footerLeft.joinToString("") { it.text }).append("   ").append(m.footerRight)
+    // The phone's system font may not draw ✓ either, so the preview spells it out.
+    append(m.footerLeft.joinToString("\n") { it.text + if (it.check) " [ready]" else "" }).append("   ").append(m.footerRight)
 })

@@ -14,8 +14,10 @@ the MIT License. This includes:
 
   - app/src/main/assets/icons/            (game images)
   - app/src/main/assets/names.json        (game names)
+  - app/src/main/assets/names_overrides.json (game names)
   - app/src/main/assets/upgrade_times.json (game data)
   - tools/icon_checklist.txt              (game names)
+  - tools/icon_staging/                   (game images)
   - docs/screenshots/                     (game images, as shown in the widget)
   - app/src/test/resources/fixtures/      (village data in the game's format)
 
@@ -32,6 +34,20 @@ https://github.com/chiefpansancolt/clash-of-clans-data
 
 That package is published under the MIT License,
 Copyright (c) 2026 Christopher Pezza.
+
+
+SUPERCELL FAN KIT
+
+The Town Hall 19 icons (since 1.1) come from the Supercell Fan Kit and are used
+under Supercell's Fan Content Policy:
+
+  - app/src/main/assets/icons/1000106.webp  (Squad Barracks)
+  - app/src/main/assets/icons/1000107.webp  (Spiky Tower)
+  - app/src/main/assets/icons/1000108.webp  (Firecracker Tower)
+  - app/src/main/assets/icons/4000195.webp  (Barch Squad)
+  - app/src/main/assets/icons/study_soup.webp (Study Soup)
+  - tools/icon_staging/squads/              (TH19 squads, not bundled yet)
+
 
 
 FONT

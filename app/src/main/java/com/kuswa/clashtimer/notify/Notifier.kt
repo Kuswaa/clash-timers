@@ -25,7 +25,7 @@ object Notifier {
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Upgrade finished", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "A builder, the lab or the pet house became free"
+                description = "A builder, the lab or the pet house became free, or a helper is ready"
             },
         )
     }

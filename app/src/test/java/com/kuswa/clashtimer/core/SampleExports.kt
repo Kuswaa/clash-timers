@@ -26,8 +26,22 @@ object SampleExports {
         error("none of ${candidates.toList()} found")
     }
 
+    /** The bundled names as the app loads them: generated names.json + names_overrides.json. */
     val names: NameMap by lazy {
+        NameMap.fromJson(
+            file("src/main/assets/names.json", "app/src/main/assets/names.json").readText(),
+            file("src/main/assets/names_overrides.json", "app/src/main/assets/names_overrides.json").readText(),
+        )
+    }
+
+    /** Only the generated names.json, to test that the overrides win. */
+    val generatedNames: NameMap by lazy {
         NameMap.fromJson(file("src/main/assets/names.json", "app/src/main/assets/names.json").readText())
+    }
+
+    /** File names in `assets/icons`, for icon checks. */
+    val iconFiles: Set<String> by lazy {
+        (file("src/main/assets/icons/1000001.webp", "app/src/main/assets/icons/1000001.webp").parentFile.list() ?: emptyArray()).toSet()
     }
 
     val times: UpgradeTimes by lazy {
@@ -47,6 +61,10 @@ object SampleExports {
     val export2: VillageExport by lazy { parse("export_2.json") }
     val export3: VillageExport by lazy { parse("export_3.json") }
     val export4: VillageExport by lazy { parse("export_4.json") }
+    /** Kuswa's TH19 village, 16 Nov 2026 (1.1). */
+    val export5: VillageExport by lazy { parse("export_5.json") }
+    /** A second account (TH16, 17 Nov 2026) with Goblin Builder + Researcher, all potions, both helpers. */
+    val alt1: VillageExport by lazy { parse("alt_export_1.json") }
 
     private val FMT = DateTimeFormatter.ofPattern("EEE dd MMM HH:mm:ss")
 

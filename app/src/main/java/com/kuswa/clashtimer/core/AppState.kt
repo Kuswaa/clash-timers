@@ -55,6 +55,8 @@ data class AppSettings(
      * null = never asked (the prompt shows); blank = asked and left empty ([DEFAULT_PLAYER_NAME]).
      */
     val playerName: String? = null,
+    /** Time left (default), finish time (`Thu 18:36`) or both (`1d 4h · Thu 18:36`) on running rows. */
+    val countdownStyle: CountdownStyle = CountdownStyle.TIME_LEFT,
 ) {
     /** The name the widget shows: [playerName], or [DEFAULT_PLAYER_NAME] if it is missing or blank. */
     val displayName: String get() = playerName?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_PLAYER_NAME

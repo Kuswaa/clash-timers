@@ -17,12 +17,12 @@ class NameMapTest {
 
     @Test fun assetLoads() {
         assertTrue("expected ~200 home-village names, got ${names.size}", names.size >= 190)
-        assertEquals("Town Hall", names.name(1000001))
-        assertEquals("Builder's Hut", names.name(GameIds.BUILDERS_HUT))
-        assertEquals("B.O.B's Hut", names.name(GameIds.BOBS_HUT))
-        assertEquals("Builder's Apprentice", names.name(GameIds.HELPER_BUILDERS_APPRENTICE))
-        assertEquals("Lab Assistant", names.name(GameIds.HELPER_LAB_ASSISTANT))
-        assertEquals("Prospector", names.name(GameIds.HELPER_PROSPECTOR))
+        assertEquals("Town Hall", names.nameOrNull(1000001))
+        assertEquals("Builder's Hut", names.nameOrNull(GameIds.BUILDERS_HUT))
+        assertEquals("B.O.B's Hut", names.nameOrNull(GameIds.BOBS_HUT))
+        assertEquals("Builder's Apprentice", names.nameOrNull(GameIds.HELPER_BUILDERS_APPRENTICE))
+        assertEquals("Lab Assistant", names.nameOrNull(GameIds.HELPER_LAB_ASSISTANT))
+        assertEquals("Prospector", names.nameOrNull(GameIds.HELPER_PROSPECTOR))
     }
 
     /** Every upgradable thing in both exports must have a real name (helpers 93000003 is not shown). */
@@ -67,16 +67,17 @@ class NameMapTest {
     }
 
     @Test fun unknownIdsFallBack() {
+        // 1.1: a category name on the widget, never the raw ID (that stays in the diagnostics).
         val job = Job(JobCategory.BUILDER, JobSource.BUILDING, 1000999, 3, 100, false)
-        assertEquals("Unknown (1000999) → 4", names.label(job))
-        assertEquals("Unknown (1000999) (new)", names.label(job.copy(currentLevel = 0)))
+        assertEquals("New building → 4", names.label(job))
+        assertEquals("New building (new)", names.label(job.copy(currentLevel = 0)))
         val module = Job(JobCategory.BUILDER, JobSource.MODULE, 102000999, 1, 100, false, 1000097, 103000999)
-        assertEquals("Unknown (103000999) Unknown (102000999) → 2", names.label(module))
+        assertEquals("${names.nameOrNull(1000097)} module → 2", names.label(module))
     }
 
     @Test fun acceptsFlatMapToo() {
         val m = NameMap.fromJson("""{"1":"A","x":"ignored","2":3}""")
         assertEquals(1, m.size)
-        assertEquals("A", m.name(1))
+        assertEquals("A", m.nameOrNull(1))
     }
 }

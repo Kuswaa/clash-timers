@@ -149,10 +149,9 @@ class Export3Test {
         export3.builderJobs.forEach { assertEquals(t0 + it.remainingAtT0 - 603, timings.getValue(it)) }
         assertEquals(t0 + 566723, timings.getValue(export3.labJob!!))
         assertEquals(t0 + 132593, timings.getValue(export3.petJob!!))
-
-        val noGoblinBoost = TimerEngine(BoostSettings(boostsApplyToGoblin = false))
+        // 1.1: the Goblin Builder is always sped up by builder potions (the 1.0 switch is gone).
         val goblin = export3.builderJobs.single { it.isGoblin }
-        assertEquals(t0 + 67572, noGoblinBoost.finishTime(goblin, export3, s.links, s.boosts))
+        assertEquals(t0 + 67572 - 603, timings.getValue(goblin))
     }
 
     // ---- Widget ----
@@ -193,10 +192,8 @@ class Export3Test {
         assertEquals(1 - 41921 / 1166400f, m.builderRows[0].progress, 1e-4f)
         assertEquals(listOf(28000000), m.builderRows[2].iconIds)
         assertEquals(listOf("IT", "WT", "BK", "S", "S", "RC", "L"), m.builderRows.map { it.initials })
-        assertEquals(
-            listOf(FooterPart("Apprentice idle", FooterTone.IDLE), FooterPart(" · "), FooterPart("Assistant idle", FooterTone.IDLE)),
-            m.footerLeft,
-        )
+        // 1.1: neither helper works (Assistant on a finished spell), both on cooldown for 1331 s.
+        assertEquals(listOf(FooterPart("Apprentice: 23m"), FooterPart("Assistant: 23m")), m.footerLeft)
         assertEquals("synced just now", m.footerRight)
     }
 

@@ -2,6 +2,7 @@ package com.kuswa.clashtimer.sync
 
 import android.content.ClipboardManager
 import android.content.Context
+import com.kuswa.clashtimer.core.AccountSync
 import com.kuswa.clashtimer.core.SyncLogic
 import com.kuswa.clashtimer.core.describe
 import com.kuswa.clashtimer.data.Names
@@ -35,11 +36,15 @@ object SyncRunner {
         val app = context.applicationContext
         val repo = StateRepository(app)
         val result = try {
-            val outcome = repo.updateState { old ->
-                val o = SyncLogic.apply(old, clipboard)
-                o.state to o
+            val names = Names.load(app)
+            // The export's village tag picks the account; other accounts are left as they are.
+            val (outcome, accountCount) = repo.updateAccounts { accounts ->
+                val (next, o) = AccountSync.apply(accounts, clipboard)
+                next to (o to next.byTag.size)
             }
-            Result(outcome is SyncLogic.Outcome.Synced, plainText(outcome.describe(Names.get(app))))
+            val text = outcome.describe(names) +
+                if (outcome is SyncLogic.Outcome.Synced && accountCount > 1) " · account ${outcome.export.tag} ($accountCount saved)" else ""
+            Result(outcome is SyncLogic.Outcome.Synced, plainText(text))
         } catch (t: Throwable) {
             Result(false, "Error: ${t.javaClass.simpleName}: ${t.message}")
         }

@@ -18,7 +18,7 @@ object WidgetActions {
         val newLinks = when (job.category) {
             JobCategory.BUILDER ->
                 links.copy(apprenticeJobKey = if (links.apprenticeJobKey == jobKey) null else jobKey)
-            JobCategory.LAB ->
+            JobCategory.LAB -> if (job.isGoblin) return state else // no Lab Assistant on Goblin research
                 links.copy(labAssistantJobKey = if (links.labAssistantJobKey == jobKey) null else jobKey)
             JobCategory.PET -> return state
         }
@@ -75,6 +75,7 @@ object WidgetActions {
         BoostType.BUILDER_BITE.name -> "Builder Bite"
         BoostType.RESEARCH_POTION.name -> "Research potion"
         BoostType.PET_POTION.name -> "Pet potion"
+        BoostType.STUDY_SOUP.name -> "Study Soup"
         else -> arg
     }
 }
@@ -102,16 +103,34 @@ object FinishNotices {
             .filter { (job, at) -> job.key !in state.notified && at > now - MAX_AGE_SEC }
             .sortedBy { it.second }
             .map { (job, _) -> notice(job, names) }
-        return Result(notices, finished.map { it.first.key }.toSet())
+        // "Builder's Apprentice is ready": only for a cooldown that ended after the export. One that was
+        // already over at T0 was visible in the game when the data was copied, so a sync never re-announces it.
+        val ready = HelperStatuses.of(state, settings.boosts, now)
+            .filterIsInstance<HelperStatus.Ready>()
+            .filter { it.readyAt > export.timestamp }
+        val readyNotices = ready
+            .filter { readyKey(it) !in state.notified && it.readyAt > now - MAX_AGE_SEC }
+            .map(::readyNotice)
+        return Result(notices + readyNotices, finished.map { it.first.key }.toSet() + ready.map(::readyKey))
     }
 
-    /** Next finish time (epoch s) of a job that isn't [Finish.isDone] at [now]. */
+    /** Next finish time (epoch s) of a job that isn't [Finish.isDone] at [now], or a helper's cooldown end. */
     fun nextFinish(state: AppState, settings: AppSettings, now: Long): Long? {
         val export = state.export ?: return null
         val engine = TimerEngine(settings.boosts)
-        return export.jobs.map { engine.finishTime(it, export, state.links, state.boosts) }
-            .filter { !Finish.isDone(it, now) }.minOrNull()
+        val jobs = export.jobs.map { engine.finishTime(it, export, state.links, state.boosts) }
+            .filter { !Finish.isDone(it, now) }
+        val helpers = HelperStatuses.of(state, settings.boosts, now).filterIsInstance<HelperStatus.Cooldown>().map { it.readyAt }
+        return (jobs + helpers).minOrNull()
     }
+
+    fun readyKey(status: HelperStatus.Ready): String = "helper:${status.kind.name}:${status.readyAt}"
+
+    fun readyNotice(status: HelperStatus.Ready): FinishNotice = FinishNotice(
+        jobKey = readyKey(status),
+        title = "${status.kind.fullName} is ready",
+        text = if (status.kind == HelperKind.APPRENTICE) "Assign it to an upgrade in Clash." else "Assign it to a research in Clash.",
+    )
 
     /**
      * Epoch s for the wakeup finish alarm: [Finish.GRACE_SEC] after the next finish, so the redraw it
@@ -124,6 +143,7 @@ object FinishNotices {
         val title = names.title(job)
         val text = if (job.isNewBuilding) "$title is built." else "$title reached level ${job.targetLevel}."
         val heading = when {
+            job.category == JobCategory.LAB && job.isGoblin -> "Goblin Researcher done: $title"
             job.category == JobCategory.LAB -> "Lab free"
             job.category == JobCategory.PET -> "Pet house free"
             job.isGoblin -> "Goblin Builder done: $title"

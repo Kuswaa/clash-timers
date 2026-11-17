@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generic icon for a pet with no icon file: a paw print. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#CFC3B0"
+        android:pathData="M12,12c2.8,0 5,2.6 5,5c0,1.9 -1.6,2.5 -2.6,2.5c-1,0 -1.5,-0.6 -2.4,-0.6s-1.4,0.6 -2.4,0.6c-1,0 -2.6,-0.6 -2.6,-2.5c0,-2.4 2.2,-5 5,-5z" />
+    <path android:fillColor="#CFC3B0"
+        android:pathData="M6,8.5a1.8,2.2 0,1 1,0.01 0zM18,8.5a1.8,2.2 0,1 1,0.01 0zM9.5,4.5a1.8,2.3 0,1 1,0.01 0zM14.5,4.5a1.8,2.3 0,1 1,0.01 0z" />
+</vector>

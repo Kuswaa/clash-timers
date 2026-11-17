@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The widget. Only the wooden panel is drawn; the root is
-     transparent so the wallpaper shows around it. Rows are added at runtime (widget_row*.xml). -->
+<!-- The widget. Only the wooden panel is drawn; the root is transparent so the wallpaper shows
+     around it. Rows are added at runtime (widget_row*.xml). The five pill buttons are identical
+     apart from their ids, icon and idle text: keep them in sync when editing one. The one Study Soup
+     button sits on the LAB line; its window speeds up the lab and the pets. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -25,7 +27,7 @@
             android:paddingStart="4dp"
             android:paddingTop="2dp"
             android:paddingEnd="4dp"
-            android:paddingBottom="6dp">
+            android:paddingBottom="2dp">
 
             <TextView
                 android:id="@+id/who"
@@ -78,18 +80,16 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <!-- BUILDERS x/6 + Goblin   [Bite] [+1] -->
+            <!-- BUILDERS   [Bite] [+1]  (hidden in the one-line-per-section layout) -->
             <LinearLayout
+                android:id="@+id/line_builders"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="2dp"
-                android:layout_marginTop="4dp"
                 android:layout_marginEnd="2dp"
-                android:layout_marginBottom="3dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="2dp"
-                android:paddingEnd="2dp">
+                android:paddingStart="2dp">
 
                 <TextView
                     android:id="@+id/builders_label"
@@ -97,12 +97,15 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:ellipsize="end"
                     android:text="BUILDERS" />
 
+                <!-- bite: tap targets are fixed at 40 x 40 dp or more (plan 1.1 §3.4); the visible pill is
+                     the inset background, so the "−" appearing never shrinks the "add" area. -->
                 <LinearLayout
                     android:id="@+id/pill_bite"
                     android:layout_width="wrap_content"
-                    android:layout_height="22dp"
+                    android:layout_height="40dp"
                     android:background="@drawable/pill_off"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
@@ -112,7 +115,8 @@
                         android:id="@+id/pill_bite_add"
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
-                        android:gravity="center_vertical"
+                        android:gravity="center"
+                        android:minWidth="40dp"
                         android:orientation="horizontal"
                         android:paddingStart="7dp"
                         android:paddingEnd="7dp">
@@ -135,11 +139,10 @@
                     <!-- Small "−": undo the last hour. Shown only while a boost of this type runs or is queued. -->
                     <LinearLayout
                         android:id="@+id/pill_bite_undo"
-                        android:layout_width="wrap_content"
+                        android:layout_width="40dp"
                         android:layout_height="match_parent"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingEnd="6dp"
                         android:visibility="gone">
 
                         <!-- ImageView, not View: RemoteViews only inflates whitelisted classes. -->
@@ -152,16 +155,18 @@
                         <ImageView
                             android:layout_width="10dp"
                             android:layout_height="10dp"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="14dp"
                             android:src="@drawable/ic_minus" />
                     </LinearLayout>
                 </LinearLayout>
 
+                <!-- bpot: tap targets are fixed at 40 x 40 dp or more (plan 1.1 §3.4); the visible pill is
+                     the inset background, so the "−" appearing never shrinks the "add" area. -->
                 <LinearLayout
                     android:id="@+id/pill_bpot"
                     android:layout_width="wrap_content"
-                    android:layout_height="22dp"
-                    android:layout_marginStart="5dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="4dp"
                     android:background="@drawable/pill_off"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
@@ -171,7 +176,8 @@
                         android:id="@+id/pill_bpot_add"
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
-                        android:gravity="center_vertical"
+                        android:gravity="center"
+                        android:minWidth="40dp"
                         android:orientation="horizontal"
                         android:paddingStart="7dp"
                         android:paddingEnd="7dp">
@@ -194,11 +200,10 @@
                     <!-- Small "−": undo the last hour. Shown only while a boost of this type runs or is queued. -->
                     <LinearLayout
                         android:id="@+id/pill_bpot_undo"
-                        android:layout_width="wrap_content"
+                        android:layout_width="40dp"
                         android:layout_height="match_parent"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingEnd="6dp"
                         android:visibility="gone">
 
                         <!-- ImageView, not View: RemoteViews only inflates whitelisted classes. -->
@@ -211,7 +216,7 @@
                         <ImageView
                             android:layout_width="10dp"
                             android:layout_height="10dp"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="14dp"
                             android:src="@drawable/ic_minus" />
                     </LinearLayout>
                 </LinearLayout>
@@ -223,30 +228,93 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <!-- LAB   [+1] -->
+            <!-- LAB   [Soup] [+1]  (hidden in the one-line-per-section layout) -->
             <LinearLayout
+                android:id="@+id/line_lab"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="2dp"
-                android:layout_marginTop="4dp"
                 android:layout_marginEnd="2dp"
-                android:layout_marginBottom="3dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="2dp"
-                android:paddingEnd="2dp">
+                android:paddingStart="2dp">
 
                 <TextView
+                    android:id="@+id/lab_label"
                     style="@style/WidgetText.Section"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:ellipsize="end"
                     android:text="LAB" />
 
+                <!-- lsoup: tap targets are fixed at 40 x 40 dp or more (plan 1.1 §3.4); the visible pill is
+                     the inset background, so the "−" appearing never shrinks the "add" area. -->
+                <LinearLayout
+                    android:id="@+id/pill_lsoup"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:background="@drawable/pill_off"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <!-- Tap: one more hour (stacked after a running one). -->
+                    <LinearLayout
+                        android:id="@+id/pill_lsoup_add"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:minWidth="40dp"
+                        android:orientation="horizontal"
+                        android:paddingStart="7dp"
+                        android:paddingEnd="7dp">
+
+                        <ImageView
+                            android:id="@+id/pill_lsoup_icon"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginEnd="3dp"
+                            android:src="@drawable/ic_study_soup" />
+
+                        <TextView
+                            android:id="@+id/pill_lsoup_text"
+                            style="@style/WidgetText.Pill"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Soup" />
+                    </LinearLayout>
+
+                    <!-- Small "−": undo the last hour. Shown only while a boost of this type runs or is queued. -->
+                    <LinearLayout
+                        android:id="@+id/pill_lsoup_undo"
+                        android:layout_width="40dp"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <!-- ImageView, not View: RemoteViews only inflates whitelisted classes. -->
+                        <ImageView
+                            android:layout_width="1dp"
+                            android:layout_height="12dp"
+                            android:scaleType="fitXY"
+                            android:src="@drawable/pill_divider" />
+
+                        <ImageView
+                            android:layout_width="10dp"
+                            android:layout_height="10dp"
+                            android:layout_marginStart="14dp"
+                            android:src="@drawable/ic_minus" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- rpot: tap targets are fixed at 40 x 40 dp or more (plan 1.1 §3.4); the visible pill is
+                     the inset background, so the "−" appearing never shrinks the "add" area. -->
                 <LinearLayout
                     android:id="@+id/pill_rpot"
                     android:layout_width="wrap_content"
-                    android:layout_height="22dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="4dp"
                     android:background="@drawable/pill_off"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
@@ -256,7 +324,8 @@
                         android:id="@+id/pill_rpot_add"
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
-                        android:gravity="center_vertical"
+                        android:gravity="center"
+                        android:minWidth="40dp"
                         android:orientation="horizontal"
                         android:paddingStart="7dp"
                         android:paddingEnd="7dp">
@@ -279,11 +348,10 @@
                     <!-- Small "−": undo the last hour. Shown only while a boost of this type runs or is queued. -->
                     <LinearLayout
                         android:id="@+id/pill_rpot_undo"
-                        android:layout_width="wrap_content"
+                        android:layout_width="40dp"
                         android:layout_height="match_parent"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingEnd="6dp"
                         android:visibility="gone">
 
                         <!-- ImageView, not View: RemoteViews only inflates whitelisted classes. -->
@@ -296,7 +364,7 @@
                         <ImageView
                             android:layout_width="10dp"
                             android:layout_height="10dp"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="14dp"
                             android:src="@drawable/ic_minus" />
                     </LinearLayout>
                 </LinearLayout>
@@ -308,30 +376,32 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <!-- PETS   [+1] -->
+            <!-- PETS   [+1]  (hidden in the one-line-per-section layout) -->
             <LinearLayout
+                android:id="@+id/line_pets"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="2dp"
-                android:layout_marginTop="4dp"
                 android:layout_marginEnd="2dp"
-                android:layout_marginBottom="3dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="2dp"
-                android:paddingEnd="2dp">
+                android:paddingStart="2dp">
 
                 <TextView
+                    android:id="@+id/pets_label"
                     style="@style/WidgetText.Section"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
+                    android:ellipsize="end"
                     android:text="PETS" />
 
+                <!-- ppot: tap targets are fixed at 40 x 40 dp or more (plan 1.1 §3.4); the visible pill is
+                     the inset background, so the "−" appearing never shrinks the "add" area. -->
                 <LinearLayout
                     android:id="@+id/pill_ppot"
                     android:layout_width="wrap_content"
-                    android:layout_height="22dp"
+                    android:layout_height="40dp"
                     android:background="@drawable/pill_off"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
@@ -341,7 +411,8 @@
                         android:id="@+id/pill_ppot_add"
                         android:layout_width="wrap_content"
                         android:layout_height="match_parent"
-                        android:gravity="center_vertical"
+                        android:gravity="center"
+                        android:minWidth="40dp"
                         android:orientation="horizontal"
                         android:paddingStart="7dp"
                         android:paddingEnd="7dp">
@@ -364,11 +435,10 @@
                     <!-- Small "−": undo the last hour. Shown only while a boost of this type runs or is queued. -->
                     <LinearLayout
                         android:id="@+id/pill_ppot_undo"
-                        android:layout_width="wrap_content"
+                        android:layout_width="40dp"
                         android:layout_height="match_parent"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingEnd="6dp"
                         android:visibility="gone">
 
                         <!-- ImageView, not View: RemoteViews only inflates whitelisted classes. -->
@@ -381,7 +451,7 @@
                         <ImageView
                             android:layout_width="10dp"
                             android:layout_height="10dp"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="14dp"
                             android:src="@drawable/ic_minus" />
                     </LinearLayout>
                 </LinearLayout>
@@ -393,29 +463,87 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <!-- Footer: helper status left, sync age right. -->
+            <!-- Footer: one line per helper on the left, sync age on the right. -->
             <LinearLayout
+                android:id="@+id/footer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:orientation="horizontal"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical"
                 android:paddingStart="4dp"
                 android:paddingEnd="4dp">
 
-                <TextView
-                    android:id="@+id/foot_left"
-                    style="@style/WidgetText.Footer"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/foot_right"
-                    style="@style/WidgetText.Footer"
-                    android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/foot_line1"
+                            style="@style/WidgetText.Footer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end" />
+
+                        <!-- "ready ✓": drawn, the font has no ✓ glyph. -->
+                        <ImageView
+                            android:id="@+id/foot_check1"
+                            android:layout_width="11dp"
+                            android:layout_height="11dp"
+                            android:layout_marginStart="3dp"
+                            android:src="@drawable/ic_check"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/foot_right"
+                        style="@style/WidgetText.Footer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/foot_row2"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp" />
+                    android:layout_marginTop="2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/foot_line2"
+                            style="@style/WidgetText.Footer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end" />
+
+                        <!-- "ready ✓": drawn, the font has no ✓ glyph. -->
+                        <ImageView
+                            android:id="@+id/foot_check2"
+                            android:layout_width="11dp"
+                            android:layout_height="11dp"
+                            android:layout_marginStart="3dp"
+                            android:src="@drawable/ic_check"
+                            android:visibility="gone" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
 
@@ -425,7 +553,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:minHeight="140dp"
+            android:minHeight="110dp"
             android:orientation="vertical"
             android:padding="12dp">
 

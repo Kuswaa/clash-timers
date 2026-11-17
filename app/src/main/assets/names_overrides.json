@@ -1,0 +1,9 @@
+{
+  "_comment": "Hand-maintained names that beat the generated names.json (clash-of-clans-data has no TH19 items yet). 1000108 is predicted (IDs are sequential); see CLAUDE.md for the squad list.",
+  "names": {
+    "1000106": "Squad Barracks",
+    "1000107": "Spiky Tower",
+    "1000108": "Firecracker Tower",
+    "4000195": "Barch Squad"
+  }
+}

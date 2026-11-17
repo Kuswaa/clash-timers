@@ -18,7 +18,7 @@
 
     <application
         android:name=".ClashApp"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -62,6 +62,18 @@
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:theme="@style/Theme.ClashTimer.Invisible" />
+
+        <!-- Quick Settings tile "Clash Sync": opens the same invisible sync screen from the notification shade. -->
+        <service
+            android:name=".sync.SyncTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_sync"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".widget.ClashWidgetReceiver"

@@ -28,12 +28,17 @@ object SyncLogic {
             labAssistantJobKey = linkFor(JobCategory.LAB, export, previous, old.links.labAssistantJobKey),
         )
         var boosts = old.boosts.filter { it.end > export.timestamp }
-        // `boosts.builder_boost` is the game's own remaining builder-potion time (stacked potions included),
-        // so it replaces any builder-potion windows tapped on the widget instead of adding to them.
-        export.builderBoostRemaining?.let { left ->
-            boosts = boosts.filterNot { it.type == BoostType.BUILDER_POTION } +
-                BoostUse(BoostType.BUILDER_POTION, export.timestamp, export.timestamp + left)
+        // `boosts.builder_boost` / `lab_boost` / `pet_boost` are the game's own remaining potion time (stacked
+        // potions included), so each replaces the widget-tapped windows of that potion instead of adding to them.
+        // Snacks (Builder Bite, Study Soup) are assumed not to appear there: tapped ones are kept as they are,
+        // so nothing is counted twice.
+        fun fromExport(type: BoostType, left: Long?) {
+            if (left == null) return // absent is no proof that nothing runs (exports 1-2): keep tapped windows
+            boosts = boosts.filterNot { it.type == type } + BoostUse(type, export.timestamp, export.timestamp + left)
         }
+        fromExport(BoostType.BUILDER_POTION, export.builderBoostRemaining)
+        fromExport(BoostType.RESEARCH_POTION, export.labBoostRemaining)
+        fromExport(BoostType.PET_POTION, export.petBoostRemaining)
 
         return Outcome.Synced(
             AppState(
@@ -56,7 +61,8 @@ object SyncLogic {
      * is idle → no link. Otherwise a manual link from the widget is carried over if its job still runs.
      */
     private fun linkFor(category: JobCategory, export: VillageExport, previous: VillageExport?, oldKey: String?): String? {
-        val candidates = export.jobs.filter { it.category == category }
+        // The Lab Assistant works only on the laboratory's own research, never the Goblin Researcher's.
+        val candidates = export.jobs.filter { it.category == category && !(category == JobCategory.LAB && it.isGoblin) }
         candidates.firstOrNull { it.helperLinked }?.let { return it.key }
         if (category in export.helperOnFinishedItem) return null
         return carryOver(oldKey, previous, candidates)
@@ -88,7 +94,10 @@ fun SyncLogic.Outcome.describe(names: NameMap): String = when (this) {
         if (e.regularBuilderJobs.size != 1) append("s")
         if (goblin > 0) append(" + Goblin")
         append(" · lab: ").append(e.labJob?.let(names::label) ?: "idle")
+        e.goblinLabJob?.let { append(" + Goblin: ").append(names.label(it)) }
         append(" · pet: ").append(e.petJob?.let(names::label) ?: "idle")
         e.builderBoostRemaining?.let { append(" · builder potion ${WidgetModelBuilder.formatRemaining(it)} left") }
+        e.labBoostRemaining?.let { append(" · research potion ${WidgetModelBuilder.formatRemaining(it)} left") }
+        e.petBoostRemaining?.let { append(" · pet potion ${WidgetModelBuilder.formatRemaining(it)} left") }
     }
 }
